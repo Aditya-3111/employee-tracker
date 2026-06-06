@@ -248,6 +248,7 @@ socket.on('employee:location', ({ id, location }) => {
     markers[id] = L.marker(latlng, { icon: makeIcon('#4cff91') })
       .addTo(map)
       .bindPopup(`<b>${employees[id]?.name || 'Employee'}</b><br>${employees[id]?.empId || ''}`);
+      map.setView(latlng, 15); // auto zoom to employee location
   }
   updateStats();
 });
