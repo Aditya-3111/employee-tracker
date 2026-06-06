@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Live Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Mono:wght@400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c14;--bg2:#0e1520;--bg3:#141d2e;
+      --accent:#00e5ff;--green:#4cff91;--red:#ff6b6b;--yellow:#ffd166;
+      --text:#e8edf5;--muted:#4a5875;--border:rgba(255,255,255,0.07);
+    }
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+
+    /* LOGIN */
+    #login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 0%,rgba(0,229,255,0.07) 0%,transparent 70%)}
+    .login-box{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:48px 40px;width:360px;text-align:center}
+    .login-box h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:8px}
+    .login-box p{font-size:13px;color:var(--muted);margin-bottom:28px}
+    .login-box input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--text);font-family:'DM Mono',monospace;font-size:14px;outline:none;margin-bottom:14px;letter-spacing:2px;transition:border-color 0.2s}
+    .login-box input:focus{border-color:rgba(0,229,255,0.4)}
+    .login-box button{width:100%;background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer}
+    .login-err{color:var(--red);font-size:13px;margin-top:10px;display:none}
+
+    /* DASHBOARD */
+    #dashboard{display:none;flex-direction:column;min-height:100vh}
+
+    /* HEADER */
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200}
+    .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px}
+    .logo span{color:var(--accent)}
+    .hright{display:flex;gap:10px;align-items:center}
+    .badge{font-size:11px;font-family:'DM Mono',monospace;padding:5px 12px;border-radius:20px}
+    .badge-green{background:rgba(76,255,145,0.08);color:var(--green);border:1px solid rgba(76,255,145,0.2)}
+    .badge-count{background:rgba(0,229,255,0.08);color:var(--accent);border:1px solid rgba(0,229,255,0.2)}
+
+    /* STATS BAR */
+    .stats-bar{display:flex;gap:12px;padding:16px 28px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto}
+    .stat{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 20px;white-space:nowrap;flex-shrink:0}
+    .stat-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:4px}
+    .stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+    .sv-green{color:var(--green)} .sv-accent{color:var(--accent)} .sv-yellow{color:var(--yellow)}
+
+    /* MAIN LAYOUT */
+    .main{display:grid;grid-template-columns:1fr 380px;gap:0;flex:1;min-height:0}
+
+    /* LEFT — VIDEO GRID */
+    .video-section{padding:20px;overflow-y:auto;border-right:1px solid var(--border)}
+    .section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    .video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+
+    .emp-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color 0.2s}
+    .emp-card:hover{border-color:rgba(0,229,255,0.2)}
+    .emp-card.offline{opacity:0.5}
+
+    .video-wrap{position:relative;background:#000;aspect-ratio:4/3}
+    video{width:100%;height:100%;object-fit:cover;display:block}
+    .video-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px}
+    .video-placeholder .big{font-size:36px}
+    .live-badge{position:absolute;top:8px;left:8px;background:rgba(255,107,107,0.9);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px;letter-spacing:1px}
+    .live-dot{width:6px;height:6px;background:#fff;border-radius:50%;animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+    .emp-info{padding:10px 12px}
+    .emp-name{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:4px}
+    .emp-meta{display:flex;justify-content:space-between;align-items:center}
+    .emp-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+    .emp-loc{font-size:11px;color:var(--accent)}
+    .emp-status-row{display:flex;gap:5px;margin-top:6px}
+    .tag{font-size:10px;padding:2px 7px;border-radius:10px;font-family:'DM Mono',monospace}
+    .tag-green{background:rgba(76,255,145,0.1);color:var(--green);border:1px solid rgba(76,255,145,0.2)}
+    .tag-red{background:rgba(255,107,107,0.1);color:var(--red);border:1px solid rgba(255,107,107,0.2)}
+    .tag-blue{background:rgba(0,229,255,0.1);color:var(--accent);border:1px solid rgba(0,229,255,0.2)}
+
+    .stream-btn{width:100%;background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);color:var(--accent);font-size:12px;padding:7px;border-radius:8px;cursor:pointer;margin-top:8px;transition:all 0.2s;font-family:'DM Sans',sans-serif}
+    .stream-btn:hover{background:rgba(0,229,255,0.15)}
+    .stream-btn.active{background:rgba(255,107,107,0.1);border-color:rgba(255,107,107,0.3);color:var(--red)}
+
+    /* RIGHT — MAP */
+    .map-section{display:flex;flex-direction:column;min-height:0}
+    .map-header{padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg2)}
+    .map-header h3{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
+    #map{flex:1;min-height:400px}
+    .map-legend{padding:12px 20px;background:var(--bg2);border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+    .legend-dot{width:10px;height:10px;border-radius:50%}
+
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty-state .big{font-size:48px;margin-bottom:16px}
+    .empty-state p{font-size:14px}
+
+    /* Leaflet overrides */
+    .leaflet-container{background:#0e1520}
+    .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.1)}
+
+    @media(max-width:900px){
+      .main{grid-template-columns:1fr}
+      .map-section{min-height:350px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-box">
+    <div style="font-size:40px;margin-bottom:16px">🖥️</div>
+    <h2>Admin Monitor</h2>
+    <p>Enter password to access live dashboard</p>
+    <input type="password" id="pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button onclick="doLogin()">Access Dashboard</button>
+    <div class="login-err" id="login-err">Wrong password</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <header>
+    <div class="logo">Info<span>soft</span> <span style="font-size:13px;color:var(--muted);font-weight:400;font-family:'DM Mono',monospace">Live Monitor</span></div>
+    <div class="hright">
+      <span class="badge badge-green">● Live</span>
+      <span class="badge badge-count" id="hdr-count">0 Online</span>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-label">Online</div><div class="stat-val sv-green" id="st-online">0</div></div>
+    <div class="stat"><div class="stat-label">Streaming</div><div class="stat-val sv-accent" id="st-streaming">0</div></div>
+    <div class="stat"><div class="stat-label">GPS Active</div><div class="stat-val sv-yellow" id="st-gps">0</div></div>
+    <div class="stat"><div class="stat-label">Total Today</div><div class="stat-val" id="st-total">0</div></div>
+  </div>
+
+  <div class="main">
+    <!-- VIDEO GRID -->
+    <div class="video-section">
+      <div class="section-title">📷 Live Feeds</div>
+      <div class="video-grid" id="video-grid">
+        <div class="empty-state" id="empty-msg">
+          <div class="big">👥</div>
+          <p>Waiting for employees to check in...</p>
+          <p style="margin-top:8px;font-size:12px">Share the website link with employees</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div class="map-section">
+      <div class="map-header">
+        <h3>📍 Live Location Tracking</h3>
+      </div>
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#4cff91"></div>Online</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div>Offline</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00e5ff"></div>Moving</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const socket = io();
+
+// ── State ─────────────────────────────────────────────────────────────────
+const employees   = {};   // id → data
+const peerConns   = {};   // id → RTCPeerConnection
+const streaming   = new Set();
+let totalToday    = 0;
+
+// ── Map setup ─────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+const markers = {}; // id → L.marker
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px ${color}"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────
+function doLogin() {
+  const pw = document.getElementById('pass').value;
+  socket.emit('admin:join', { password: pw });
+}
+
+socket.on('admin:auth-fail', () => {
+  document.getElementById('login-err').style.display = 'block';
+});
+
+// ── Employee list on login ────────────────────────────────────────────────
+socket.on('admin:employee-list', (list) => {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'flex';
+  list.forEach(emp => addEmployee(emp));
+  updateStats();
+});
+
+// ── New employee joins ────────────────────────────────────────────────────
+socket.on('employee:new', (emp) => {
+  addEmployee(emp);
+  totalToday++;
+  updateStats();
+});
+
+// ── Employee goes offline ─────────────────────────────────────────────────
+socket.on('employee:offline', ({ id }) => {
+  if (employees[id]) {
+    employees[id].online = false;
+    const card = document.getElementById(`card-${id}`);
+    if (card) {
+      card.classList.add('offline');
+      const badge = card.querySelector('.live-badge');
+      if (badge) badge.remove();
+      const btn = card.querySelector('.stream-btn');
+      if (btn) btn.disabled = true;
+    }
+    if (markers[id]) markers[id].setIcon(makeIcon('#ff6b6b'));
+    updateStats();
+  }
+});
+
+// ── Location update ───────────────────────────────────────────────────────
+socket.on('employee:location', ({ id, location }) => {
+  if (employees[id]) employees[id].location = location;
+
+  const locEl = document.getElementById(`loc-${id}`);
+  if (locEl) locEl.textContent = `📍 ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}`;
+
+  // Map marker
+  const latlng = [location.lat, location.lon];
+  if (markers[id]) {
+    markers[id].setLatLng(latlng);
+    markers[id].setIcon(makeIcon('#00e5ff'));
+    setTimeout(() => { if(markers[id]) markers[id].setIcon(makeIcon('#4cff91')); }, 1000);
+  } else {
+    markers[id] = L.marker(latlng, { icon: makeIcon('#4cff91') })
+      .addTo(map)
+      .bindPopup(`<b>${employees[id]?.name || 'Employee'}</b><br>${employees[id]?.empId || ''}`);
+  }
+  updateStats();
+});
+
+// ── WebRTC answer from admin side ─────────────────────────────────────────
+socket.on('webrtc:offer', async ({ from, offer }) => {
+  const pc = peerConns[from];
+  if (!pc) return;
+  await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  socket.emit('webrtc:answer', { to: from, answer });
+});
+
+socket.on('webrtc:ice', async ({ from, candidate }) => {
+  const pc = peerConns[from];
+  if (pc) {
+    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+  }
+});
+
+// ── Add employee card ─────────────────────────────────────────────────────
+function addEmployee(emp) {
+  employees[emp.id] = emp;
+  document.getElementById('empty-msg')?.remove();
+
+  const card = document.createElement('div');
+  card.className = 'emp-card';
+  card.id = `card-${emp.id}`;
+  card.innerHTML = `
+    <div class="video-wrap" id="vwrap-${emp.id}">
+      <div class="video-placeholder" id="vph-${emp.id}">
+        <div class="big">👤</div>
+        <div>${emp.name}</div>
+        <div style="font-size:11px;margin-top:4px;color:var(--muted)">Click "Start Stream"</div>
+      </div>
+    </div>
+    <div class="emp-info">
+      <div class="emp-name">${emp.name}</div>
+      <div class="emp-meta">
+        <span class="emp-id">${emp.empId}</span>
+        <span class="emp-loc" id="loc-${emp.id}">📍 Waiting...</span>
+      </div>
+      <div class="emp-status-row">
+        <span class="tag tag-green">● Online</span>
+        <span class="tag tag-blue" id="cam-tag-${emp.id}">📷 Cam</span>
+        <span class="tag tag-blue" id="mic-tag-${emp.id}">🎙 Mic</span>
+      </div>
+      <button class="stream-btn" id="sbtn-${emp.id}" onclick="toggleStream('${emp.id}')">
+        ▶ Start Stream
+      </button>
+    </div>`;
+  document.getElementById('video-grid').appendChild(card);
+}
+
+// ── Toggle stream ─────────────────────────────────────────────────────────
+async function toggleStream(empId) {
+  const btn = document.getElementById(`sbtn-${empId}`);
+
+  if (streaming.has(empId)) {
+    // Stop stream
+    if (peerConns[empId]) {
+      peerConns[empId].close();
+      delete peerConns[empId];
+    }
+    streaming.delete(empId);
+    btn.textContent = '▶ Start Stream';
+    btn.classList.remove('active');
+    const vwrap = document.getElementById(`vwrap-${empId}`);
+    const vid = document.getElementById(`vid-${empId}`);
+    if (vid) vid.remove();
+    vwrap.innerHTML = `<div class="video-placeholder" id="vph-${empId}"><div class="big">👤</div><div>${employees[empId]?.name}</div></div>`;
+    updateStats();
+    return;
+  }
+
+  // Start stream
+  btn.textContent = '⏳ Connecting...';
+  btn.disabled = true;
+
+  const pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  });
+  peerConns[empId] = pc;
+
+  // Receive remote stream
+  pc.ontrack = (event) => {
+    const vwrap = document.getElementById(`vwrap-${empId}`);
+    let vid = document.getElementById(`vid-${empId}`);
+    if (!vid) {
+      document.getElementById(`vph-${empId}`)?.remove();
+      vid = document.createElement('video');
+      vid.id = `vid-${empId}`;
+      vid.autoplay = true;
+      vid.playsInline = true;
+      vid.muted = false;
+      vwrap.appendChild(vid);
+
+      // Live badge
+      const badge = document.createElement('div');
+      badge.className = 'live-badge';
+      badge.innerHTML = '<div class="live-dot"></div>LIVE';
+      vwrap.appendChild(badge);
+    }
+    vid.srcObject = event.streams[0];
+    streaming.add(empId);
+    btn.textContent = '⏹ Stop Stream';
+    btn.classList.add('active');
+    btn.disabled = false;
+    updateStats();
+  };
+
+  pc.onicecandidate = e => {
+    if (e.candidate) socket.emit('webrtc:ice', { to: empId, candidate: e.candidate });
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (['failed','disconnected','closed'].includes(pc.connectionState)) {
+      streaming.delete(empId);
+      btn.textContent = '▶ Start Stream';
+      btn.classList.remove('active');
+      btn.disabled = false;
+      updateStats();
+    }
+  };
+
+  // Add empty transceiver so we can receive
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+
+  socket.emit('admin:request-stream', { employeeId: empId });
+
+  // Wait for offer from employee
+  socket.once('webrtc:offer', async ({ from, offer }) => {
+    if (from !== empId) return;
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('webrtc:answer', { to: empId, answer });
+  });
+
+  setTimeout(() => {
+    if (!streaming.has(empId)) {
+      btn.textContent = '▶ Start Stream';
+      btn.disabled = false;
+      alert('Could not connect. Employee may have denied camera access.');
+    }
+  }, 12000);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────
+function updateStats() {
+  const online   = Object.values(employees).filter(e => e.online !== false).length;
+  const withGps  = Object.values(employees).filter(e => e.location).length;
+  document.getElementById('st-online').textContent    = online;
+  document.getElementById('st-streaming').textContent = streaming.size;
+  document.getElementById('st-gps').textContent       = withGps;
+  document.getElementById('st-total').textContent     = Math.max(totalToday, Object.keys(employees).length);
+  document.getElementById('hdr-count').textContent    = `${online} Online`;
+}
+
+// Auto refresh stats
+setInterval(updateStats, 5000);
+</script>
+</body>
+</html>

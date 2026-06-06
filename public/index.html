@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Infosoft — Employee Check In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#05080f;--accent:#00e5ff;--green:#4cff91;--red:#ff6b6b;--text:#e8edf5;--muted:#4a5568;--border:rgba(255,255,255,0.08)}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none}
+    .card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:24px;padding:40px 36px;max-width:420px;width:100%;position:relative;z-index:1}
+    .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;margin-bottom:4px}
+    .logo span{color:var(--accent)}
+    .tagline{font-size:13px;color:var(--muted);margin-bottom:32px}
+    .form-group{margin-bottom:16px}
+    label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px}
+    input{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;padding:13px 16px;color:var(--text);font-size:15px;outline:none;transition:border-color 0.2s}
+    input:focus{border-color:rgba(0,229,255,0.4)}
+    .perm-list{background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.12);border-radius:14px;padding:18px;margin-bottom:20px}
+    .perm-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+    .perm-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)}
+    .perm-row:last-child{border-bottom:none}
+    .perm-icon{font-size:16px;width:24px;text-align:center}
+    .perm-label{flex:1}
+    .perm-status{font-size:11px;font-weight:500}
+    .ps-pending{color:var(--muted)} .ps-ok{color:var(--green)} .ps-no{color:var(--red)}
+    .btn{width:100%;background:var(--accent);color:#000;border:none;border-radius:12px;padding:15px;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;margin-top:8px}
+    .btn:hover{background:#33ecff;transform:translateY(-1px)}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+    .status-bar{margin-top:20px;border-radius:12px;padding:14px 16px;font-size:13px;text-align:center;display:none}
+    .sb-success{background:rgba(76,255,145,0.08);border:1px solid rgba(76,255,145,0.2);color:var(--green)}
+    .sb-error{background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.2);color:var(--red)}
+    .live-dot{display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    .note{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.6}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Info<span>soft</span></div>
+  <div class="tagline">Employee Attendance Portal</div>
+
+  <div class="form-group">
+    <label>Your Name</label>
+    <input type="text" id="emp-name" placeholder="Enter your full name"/>
+  </div>
+  <div class="form-group" style="margin-bottom:20px">
+    <label>Employee ID</label>
+    <input type="text" id="emp-id" placeholder="e.g. EMP001"/>
+  </div>
+
+  <div class="perm-list">
+    <div class="perm-title">Required Permissions</div>
+    <div class="perm-row"><div class="perm-icon">📍</div><div class="perm-label">Live GPS Location</div><div class="perm-status ps-pending" id="s-gps">Pending</div></div>
+    <div class="perm-row"><div class="perm-icon">📷</div><div class="perm-label">Camera</div><div class="perm-status ps-pending" id="s-cam">Pending</div></div>
+    <div class="perm-row"><div class="perm-icon">🎙️</div><div class="perm-label">Microphone</div><div class="perm-status ps-pending" id="s-mic">Pending</div></div>
+  </div>
+
+  <button class="btn" id="checkin-btn" onclick="startCheckin()">Allow & Check In</button>
+  <div class="status-bar" id="status-bar"></div>
+  <div class="note">Your location, camera and microphone will be shared with Infosoft management for attendance and monitoring. You have been informed about this policy.</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let stream = null;
+let watchId = null;
+let peerConnections = {};
+
+function setStatus(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'perm-status ' + cls;
+}
+
+function showBar(msg, type) {
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.className = 'status-bar ' + type;
+  bar.style.display = 'block';
+}
+
+async function startCheckin() {
+  const name  = document.getElementById('emp-name').value.trim();
+  const empId = document.getElementById('emp-id').value.trim();
+  if (!name || !empId) { alert('Please enter your name and Employee ID'); return; }
+
+  const btn = document.getElementById('checkin-btn');
+  btn.disabled = true;
+  btn.textContent = 'Requesting permissions...';
+
+  // 1. GPS
+  try {
+    await new Promise((res, rej) => {
+      navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 });
+    });
+    setStatus('s-gps', '✅ Granted', 'ps-ok');
+  } catch { setStatus('s-gps', '❌ Denied', 'ps-no'); }
+
+  // 2. Camera + Mic together
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
+    setStatus('s-cam', '✅ Granted', 'ps-ok');
+    setStatus('s-mic', '✅ Granted', 'ps-ok');
+  } catch {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStatus('s-cam', '✅ Granted', 'ps-ok');
+      setStatus('s-mic', '✅ Granted', 'ps-ok');
+    } catch {
+      setStatus('s-cam', '❌ Denied', 'ps-no');
+      setStatus('s-mic', '❌ Denied', 'ps-no');
+    }
+  }
+
+  // 3. Join server
+  socket.emit('employee:join', { name, empId });
+
+  // 4. Start live GPS tracking
+  if (navigator.geolocation) {
+    watchId = navigator.geolocation.watchPosition(pos => {
+      socket.emit('employee:location', {
+        lat:      pos.coords.latitude,
+        lon:      pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        speed:    pos.coords.speed,
+        heading:  pos.coords.heading,
+      });
+    }, null, { enableHighAccuracy: true, maximumAge: 5000 });
+  }
+
+  // 5. Handle WebRTC stream request from admin
+  socket.on('stream:requested', async ({ adminId }) => {
+    if (!stream) return;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+    peerConnections[adminId] = pc;
+
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+    pc.onicecandidate = e => {
+      if (e.candidate) socket.emit('webrtc:ice', { to: adminId, candidate: e.candidate });
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('webrtc:offer', { to: adminId, offer });
+  });
+
+  socket.on('webrtc:answer', async ({ from, answer }) => {
+    const pc = peerConnections[from];
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('webrtc:ice', async ({ from, candidate }) => {
+    const pc = peerConnections[from];
+    if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  });
+
+  btn.innerHTML = '<span class="live-dot"></span>Live — Checked In';
+  showBar('✅ You are now checked in and being monitored', 'sb-success');
+}
+</script>
+</body>
+</html>

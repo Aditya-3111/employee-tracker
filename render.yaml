@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: employee-tracker
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ADMIN_PASS
+        value: admin123
+      - key: NODE_ENV
+        value: production
