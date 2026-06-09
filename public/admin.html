@@ -111,7 +111,7 @@
     <h2>Admin Monitor</h2>
     <p>Enter password to access live dashboard</p>
     <input type="password" id="pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"/>
-    <button onclick="doLogin()">Access Dashboard</button>
+    <button id="login-btn">Access Dashboard</button>
     <div class="login-err" id="login-err">Wrong password</div>
   </div>
 </div>
@@ -181,6 +181,14 @@ function checkAutoLogin() {
   }
   return false;
 }
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('pass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
 
 // Run auto login when socket connects
 socket.on('connect', () => {
