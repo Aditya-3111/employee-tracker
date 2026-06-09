@@ -166,6 +166,18 @@
 <script>
 const socket = io();
 
+// Auto login if saved today
+window.addEventListener('load', () => {
+    const savedPass = localStorage.getItem('admin_pass');
+    const savedDate = localStorage.getItem('admin_date');
+    const today     = new Date().toDateString();
+    if (savedPass && savedDate === today) {
+      SESSION_PASS = savedPass;
+      document.getElementById('pass').value = savedPass;
+      socket.emit('admin:join', { password: savedPass });
+    }
+  });
+
 // ── State ─────────────────────────────────────────────────────────────────
 const employees   = {};   // id → data
 const peerConns   = {};   // id → RTCPeerConnection
@@ -190,10 +202,25 @@ function makeIcon(color) {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────
-function doLogin() {
-  const pw = document.getElementById('pass').value;
-  socket.emit('admin:join', { password: pw });
-}
+async function doLogin() {
+    const pw = document.getElementById('pass').value;
+    const res = await fetch('/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    const d = await res.json();
+    if (d.ok) {
+      SESSION_PASS = pw;
+      // Save to localStorage with today's date
+      const today = new Date().toDateString();
+      localStorage.setItem('admin_pass', pw);
+      localStorage.setItem('admin_date', today);
+      showDashboard();
+    } else {
+      document.getElementById('login-err').style.display = 'block';
+    }
+  }
 
 socket.on('admin:auth-fail', () => {
   document.getElementById('login-err').style.display = 'block';
@@ -201,11 +228,11 @@ socket.on('admin:auth-fail', () => {
 
 // ── Employee list on login ────────────────────────────────────────────────
 socket.on('admin:employee-list', (list) => {
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'flex';
-  list.forEach(emp => addEmployee(emp));
-  updateStats();
-});
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    list.forEach(emp => addEmployee(emp));
+    updateStats();
+  });
 
 // ── New employee joins ────────────────────────────────────────────────────
 socket.on('employee:new', (emp) => {
@@ -269,6 +296,10 @@ socket.on('webrtc:ice', async ({ from, candidate }) => {
     try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
   }
 });
+
+function showDashboard() {
+    socket.emit('admin:join', { password: SESSION_PASS });
+  }
 
 // ── Add employee card ─────────────────────────────────────────────────────
 function addEmployee(emp) {
