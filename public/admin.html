@@ -192,27 +192,14 @@ document.getElementById('pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
-async function doLogin() {
-  const pw = document.getElementById('pass').value;
-  const res = await fetch('/api/admin/auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: pw })
-  });
-  const d = await res.json();
-  if (d.ok) {
-    SESSION_PASS = pw;
-    // Save with today's date
-    localStorage.setItem('admin_pass', pw);
-    localStorage.setItem('admin_date', new Date().toDateString());
-    socket.emit('admin:join', { password: pw });
-  } else {
-    document.getElementById('login-err').style.display = 'block';
-  }
-}
 
+  
 // ── SHOW DASHBOARD ────────────────────────────────────────────────────────
 socket.on('admin:employee-list', (list) => {
+  // Save password for whole day
+  localStorage.setItem('admin_pass', SESSION_PASS);
+  localStorage.setItem('admin_date', new Date().toDateString());
+  
   document.getElementById('login').style.display    = 'none';
   document.getElementById('dashboard').style.display = 'flex';
   list.forEach(emp => addEmployee(emp));

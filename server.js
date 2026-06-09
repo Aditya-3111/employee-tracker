@@ -22,6 +22,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/',      (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin', (_, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
+app.post('/api/admin/auth', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASS) res.json({ ok: true });
+  else res.status(401).json({ ok: false, error: 'Wrong password' });
+});
+
 const employees = new Map();
 const admins    = new Set();
 
