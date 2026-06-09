@@ -271,6 +271,7 @@ function addEmployee(emp) {
         '<span class="tag tag-blue">🎙 Mic</span>' +
       '</div>' +
       '<button class="stream-btn" id="sbtn-'+emp.id+'" onclick="toggleStream(\''+emp.id+'\')">▶ Start Stream</button>' +
+'<button class="stream-btn" id="cbtn-'+emp.id+'" onclick="switchCamera(\''+emp.id+'\')" style="margin-top:6px;display:none;">🔄 Switch Camera</button>' +
     '</div>';
   document.getElementById('video-grid').appendChild(card);
 }
@@ -323,6 +324,7 @@ function toggleStream(empId) {
     streaming[empId] = true;
     streamCount++;
     btn.textContent = '⏹ Stop Stream';
+    document.getElementById('cbtn-'+empId).style.display = 'block';
     btn.classList.add('active');
     btn.disabled = false;
     updateStats();
@@ -337,6 +339,7 @@ function toggleStream(empId) {
       delete streaming[empId];
       streamCount = Math.max(0, streamCount - 1);
       btn.textContent = '▶ Start Stream';
+      document.getElementById('cbtn-'+empId).style.display = 'none';
       btn.classList.remove('active');
       btn.disabled = false;
       updateStats();
@@ -368,6 +371,11 @@ function toggleStream(empId) {
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────
+
+function switchCamera(empId) {
+    socket.emit('admin:switch-camera', { employeeId: empId });
+  }
+
 function updateStats() {
   var keys   = Object.keys(employees);
   var online = 0;
