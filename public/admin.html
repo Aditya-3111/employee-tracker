@@ -166,82 +166,72 @@
 <script>
 const socket = io();
 
-// Auto login if saved today
-window.addEventListener('load', () => {
-    const savedPass = localStorage.getItem('admin_pass');
-    const savedDate = localStorage.getItem('admin_date');
-    const today     = new Date().toDateString();
-    if (savedPass && savedDate === today) {
-      SESSION_PASS = savedPass;
-      document.getElementById('pass').value = savedPass;
-      socket.emit('admin:join', { password: savedPass });
-    }
-  });
+let SESSION_PASS = '';
+let ALL_LOGS = [];
 
-// ── State ─────────────────────────────────────────────────────────────────
-const employees   = {};   // id → data
-const peerConns   = {};   // id → RTCPeerConnection
-const streaming   = new Set();
-let totalToday    = 0;
-
-// ── Map setup ─────────────────────────────────────────────────────────────
-const map = L.map('map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
-
-const markers = {}; // id → L.marker
-
-function makeIcon(color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px ${color}"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  });
+// ── AUTO LOGIN CHECK ──────────────────────────────────────────────────────
+function checkAutoLogin() {
+  const savedPass = localStorage.getItem('admin_pass');
+  const savedDate = localStorage.getItem('admin_date');
+  const today     = new Date().toDateString();
+  if (savedPass && savedDate === today) {
+    SESSION_PASS = savedPass;
+    socket.emit('admin:join', { password: savedPass });
+    return true;
+  }
+  return false;
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────
-async function doLogin() {
-    const pw = document.getElementById('pass').value;
-    const res = await fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw })
-    });
-    const d = await res.json();
-    if (d.ok) {
-      SESSION_PASS = pw;
-      // Save to localStorage with today's date
-      const today = new Date().toDateString();
-      localStorage.setItem('admin_pass', pw);
-      localStorage.setItem('admin_date', today);
-      showDashboard();
-    } else {
-      document.getElementById('login-err').style.display = 'block';
-    }
-  }
-
-socket.on('admin:auth-fail', () => {
-  document.getElementById('login-err').style.display = 'block';
+// Run auto login when socket connects
+socket.on('connect', () => {
+  checkAutoLogin();
 });
 
-// ── Employee list on login ────────────────────────────────────────────────
-socket.on('admin:employee-list', (list) => {
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'flex';
-    list.forEach(emp => addEmployee(emp));
-    updateStats();
-  });
+// ── LOGIN ─────────────────────────────────────────────────────────────────
+document.getElementById('pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
 
-// ── New employee joins ────────────────────────────────────────────────────
-socket.on('employee:new', (emp) => {
-  addEmployee(emp);
-  totalToday++;
+async function doLogin() {
+  const pw = document.getElementById('pass').value;
+  const res = await fetch('/api/admin/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw })
+  });
+  const d = await res.json();
+  if (d.ok) {
+    SESSION_PASS = pw;
+    // Save with today's date
+    localStorage.setItem('admin_pass', pw);
+    localStorage.setItem('admin_date', new Date().toDateString());
+    socket.emit('admin:join', { password: pw });
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+  }
+}
+
+// ── SHOW DASHBOARD ────────────────────────────────────────────────────────
+socket.on('admin:employee-list', (list) => {
+  document.getElementById('login').style.display    = 'none';
+  document.getElementById('dashboard').style.display = 'flex';
+  list.forEach(emp => addEmployee(emp));
   updateStats();
 });
 
-// ── Employee goes offline ─────────────────────────────────────────────────
+socket.on('admin:auth-fail', () => {
+  // Clear saved password if wrong
+  localStorage.removeItem('admin_pass');
+  localStorage.removeItem('admin_date');
+  document.getElementById('login-err').style.display = 'block';
+});
+
+// ── NEW EMPLOYEE ──────────────────────────────────────────────────────────
+socket.on('employee:new', (emp) => {
+  addEmployee(emp);
+  updateStats();
+});
+
 socket.on('employee:offline', ({ id }) => {
   if (employees[id]) {
     employees[id].online = false;
@@ -258,29 +248,24 @@ socket.on('employee:offline', ({ id }) => {
   }
 });
 
-// ── Location update ───────────────────────────────────────────────────────
 socket.on('employee:location', ({ id, location }) => {
   if (employees[id]) employees[id].location = location;
-
   const locEl = document.getElementById(`loc-${id}`);
   if (locEl) locEl.textContent = `📍 ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}`;
-
-  // Map marker
   const latlng = [location.lat, location.lon];
   if (markers[id]) {
     markers[id].setLatLng(latlng);
     markers[id].setIcon(makeIcon('#00e5ff'));
-    setTimeout(() => { if(markers[id]) markers[id].setIcon(makeIcon('#4cff91')); }, 1000);
+    setTimeout(() => { if (markers[id]) markers[id].setIcon(makeIcon('#4cff91')); }, 1000);
   } else {
     markers[id] = L.marker(latlng, { icon: makeIcon('#4cff91') })
       .addTo(map)
-      .bindPopup(`<b>${employees[id]?.name || 'Employee'}</b><br>${employees[id]?.empId || ''}`);
-      map.setView(latlng, 15); // auto zoom to employee location
+      .bindPopup(`<b>${employees[id]?.name || 'Employee'}</b>`);
+    map.setView(latlng, 15);
   }
   updateStats();
 });
 
-// ── WebRTC answer from admin side ─────────────────────────────────────────
 socket.on('webrtc:offer', async ({ from, offer }) => {
   const pc = peerConns[from];
   if (!pc) return;
@@ -292,16 +277,32 @@ socket.on('webrtc:offer', async ({ from, offer }) => {
 
 socket.on('webrtc:ice', async ({ from, candidate }) => {
   const pc = peerConns[from];
-  if (pc) {
-    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
-  }
+  if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
 });
 
-function showDashboard() {
-    socket.emit('admin:join', { password: SESSION_PASS });
-  }
+// ── STATE ─────────────────────────────────────────────────────────────────
+const employees = {};
+const peerConns = {};
+const streaming = new Set();
 
-// ── Add employee card ─────────────────────────────────────────────────────
+// ── MAP ───────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+const markers = {};
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px ${color}"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+// ── ADD EMPLOYEE CARD ─────────────────────────────────────────────────────
 function addEmployee(emp) {
   employees[emp.id] = emp;
   document.getElementById('empty-msg')?.remove();
@@ -314,7 +315,7 @@ function addEmployee(emp) {
       <div class="video-placeholder" id="vph-${emp.id}">
         <div class="big">👤</div>
         <div>${emp.name}</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--muted)">Click "Start Stream"</div>
+        <div style="font-size:11px;margin-top:4px;color:var(--muted)">Click Start Stream</div>
       </div>
     </div>
     <div class="emp-info">
@@ -325,8 +326,8 @@ function addEmployee(emp) {
       </div>
       <div class="emp-status-row">
         <span class="tag tag-green">● Online</span>
-        <span class="tag tag-blue" id="cam-tag-${emp.id}">📷 Cam</span>
-        <span class="tag tag-blue" id="mic-tag-${emp.id}">🎙 Mic</span>
+        <span class="tag tag-blue">📷 Cam</span>
+        <span class="tag tag-blue">🎙 Mic</span>
       </div>
       <button class="stream-btn" id="sbtn-${emp.id}" onclick="toggleStream('${emp.id}')">
         ▶ Start Stream
@@ -335,28 +336,21 @@ function addEmployee(emp) {
   document.getElementById('video-grid').appendChild(card);
 }
 
-// ── Toggle stream ─────────────────────────────────────────────────────────
+// ── TOGGLE STREAM ─────────────────────────────────────────────────────────
 async function toggleStream(empId) {
   const btn = document.getElementById(`sbtn-${empId}`);
 
   if (streaming.has(empId)) {
-    // Stop stream
-    if (peerConns[empId]) {
-      peerConns[empId].close();
-      delete peerConns[empId];
-    }
+    if (peerConns[empId]) { peerConns[empId].close(); delete peerConns[empId]; }
     streaming.delete(empId);
     btn.textContent = '▶ Start Stream';
     btn.classList.remove('active');
     const vwrap = document.getElementById(`vwrap-${empId}`);
-    const vid = document.getElementById(`vid-${empId}`);
-    if (vid) vid.remove();
     vwrap.innerHTML = `<div class="video-placeholder" id="vph-${empId}"><div class="big">👤</div><div>${employees[empId]?.name}</div></div>`;
     updateStats();
     return;
   }
 
-  // Start stream
   btn.textContent = '⏳ Connecting...';
   btn.disabled = true;
 
@@ -368,7 +362,6 @@ async function toggleStream(empId) {
   });
   peerConns[empId] = pc;
 
-  // Receive remote stream
   pc.ontrack = (event) => {
     const vwrap = document.getElementById(`vwrap-${empId}`);
     let vid = document.getElementById(`vid-${empId}`);
@@ -380,8 +373,6 @@ async function toggleStream(empId) {
       vid.playsInline = true;
       vid.muted = false;
       vwrap.appendChild(vid);
-
-      // Live badge
       const badge = document.createElement('div');
       badge.className = 'live-badge';
       badge.innerHTML = '<div class="live-dot"></div>LIVE';
@@ -400,7 +391,7 @@ async function toggleStream(empId) {
   };
 
   pc.onconnectionstatechange = () => {
-    if (['failed','disconnected','closed'].includes(pc.connectionState)) {
+    if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
       streaming.delete(empId);
       btn.textContent = '▶ Start Stream';
       btn.classList.remove('active');
@@ -409,13 +400,11 @@ async function toggleStream(empId) {
     }
   };
 
-  // Add empty transceiver so we can receive
   pc.addTransceiver('video', { direction: 'recvonly' });
   pc.addTransceiver('audio', { direction: 'recvonly' });
 
   socket.emit('admin:request-stream', { employeeId: empId });
 
-  // Wait for offer from employee
   socket.once('webrtc:offer', async ({ from, offer }) => {
     if (from !== empId) return;
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -428,23 +417,21 @@ async function toggleStream(empId) {
     if (!streaming.has(empId)) {
       btn.textContent = '▶ Start Stream';
       btn.disabled = false;
-      alert('Could not connect. Employee may have denied camera access.');
     }
   }, 12000);
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────
+// ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats() {
-  const online   = Object.values(employees).filter(e => e.online !== false).length;
-  const withGps  = Object.values(employees).filter(e => e.location).length;
+  const online  = Object.values(employees).filter(e => e.online !== false).length;
+  const withGps = Object.values(employees).filter(e => e.location).length;
   document.getElementById('st-online').textContent    = online;
   document.getElementById('st-streaming').textContent = streaming.size;
   document.getElementById('st-gps').textContent       = withGps;
-  document.getElementById('st-total').textContent     = Math.max(totalToday, Object.keys(employees).length);
+  document.getElementById('st-total').textContent     = Object.keys(employees).length;
   document.getElementById('hdr-count').textContent    = `${online} Online`;
 }
 
-// Auto refresh stats
 setInterval(updateStats, 5000);
 </script>
 </body>
