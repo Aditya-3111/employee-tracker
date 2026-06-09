@@ -64,7 +64,6 @@
     .legend-dot{width:10px;height:10px;border-radius:50%}
     .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
     .empty-state .big{font-size:48px;margin-bottom:16px}
-    .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.1)}
     @media(max-width:900px){.main{grid-template-columns:1fr}.map-section{min-height:350px}}
   </style>
 </head>
@@ -133,8 +132,10 @@ var streamCount  = 0;
 
 // ── MAP ───────────────────────────────────────────────────────────────────
 var map = L.map('map').setView([20.5937, 78.9629], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
 }).addTo(map);
 
 function makeIcon(color) {
