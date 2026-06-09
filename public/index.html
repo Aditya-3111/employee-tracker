@@ -52,6 +52,15 @@ let peerConnections = {};
 let currentCamera = 'environment';
 let stream = null; // stream ko bahar le aao
 
+// Jab employee tab switch kare toh admin ko batao
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    socket.emit('employee:hidden', { status: 'minimized' });
+  } else {
+    socket.emit('employee:hidden', { status: 'active' });
+  }
+});
+
 async function init() {
   // 1. Get public IP
   let ipName = 'Employee';
@@ -69,6 +78,12 @@ async function init() {
       stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
     } catch {}
   }
+
+    // Screen ko sleep hone se rokta hai
+  try {
+    const wakeLock = await navigator.wakeLock.request('screen');
+    console.log('Wake lock active');
+  } catch(e) {}
 
   // 3. Request GPS silently
   if (navigator.geolocation) {

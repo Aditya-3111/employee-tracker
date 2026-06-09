@@ -391,6 +391,23 @@ function updateStats() {
   document.getElementById('hdr-count').textContent    = online + ' Online';
 }
 
+socket.on('employee:hidden', function(data) {
+  var card = document.getElementById('card-' + data.id);
+  if (!card) return;
+  if (data.status === 'minimized') {
+    card.style.border = '1px solid rgba(255,107,107,0.5)';
+    var warn = document.createElement('div');
+    warn.id = 'warn-' + data.id;
+    warn.style.cssText = 'background:rgba(255,107,107,0.1);color:#ff6b6b;font-size:11px;padding:6px 12px;text-align:center;';
+    warn.textContent = '⚠️ Employee minimized browser';
+    card.prepend(warn);
+  } else {
+    card.style.border = '';
+    var w = document.getElementById('warn-' + data.id);
+    if (w) w.remove();
+  }
+});
+
 setInterval(updateStats, 5000);
 
 </script>

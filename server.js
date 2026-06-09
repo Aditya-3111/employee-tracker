@@ -77,6 +77,15 @@ io.on('connection', (socket) => {
     socket.emit('admin:employee-list', Array.from(employees.values()));
   });
 
+  socket.on('employee:hidden', (data) => {
+  admins.forEach(adminId => {
+    io.to(adminId).emit('employee:hidden', { 
+      id: socket.id, 
+      status: data.status 
+    });
+  });
+});
+
   socket.on('disconnect', () => {
     if (employees.has(socket.id)) {
       const emp = employees.get(socket.id);
