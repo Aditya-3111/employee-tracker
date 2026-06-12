@@ -306,6 +306,7 @@ function toggleStream(empId) {
   peerConns[empId] = pc;
 
   pc.ontrack = function(event) {
+    if (event.track.kind !== 'video') return; // sirf video track pe kaam karo
     var vwrap = document.getElementById('vwrap-'+empId);
     var vid = document.getElementById('vid-'+empId);
     if (!vid) {
