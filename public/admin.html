@@ -273,6 +273,7 @@ function addEmployee(emp) {
       '</div>' +
       '<button class="stream-btn" id="sbtn-'+emp.id+'" onclick="toggleStream(\''+emp.id+'\')">▶ Start Stream</button>' +
 '<button class="stream-btn" id="cbtn-'+emp.id+'" onclick="switchCamera(\''+emp.id+'\')" style="margin-top:6px;display:none;">🔄 Switch Camera</button>' +
+'<button class="stream-btn" id="mbtn-'+emp.id+'" onclick="toggleMic(\''+emp.id+'\')" style="margin-top:6px;display:none;">🔇 Mute Audio</button>' +
     '</div>';
   document.getElementById('video-grid').appendChild(card);
 }
@@ -326,6 +327,7 @@ function toggleStream(empId) {
     streamCount++;
     btn.textContent = '⏹ Stop Stream';
     document.getElementById('cbtn-'+empId).style.display = 'block';
+    document.getElementById('mbtn-'+empId).style.display = 'block';
     btn.classList.add('active');
     btn.disabled = false;
     updateStats();
@@ -341,6 +343,7 @@ function toggleStream(empId) {
       streamCount = Math.max(0, streamCount - 1);
       btn.textContent = '▶ Start Stream';
       document.getElementById('cbtn-'+empId).style.display = 'none';
+      document.getElementById('mbtn-'+empId).style.display = 'none';
       btn.classList.remove('active');
       btn.disabled = false;
       updateStats();
@@ -376,6 +379,25 @@ function toggleStream(empId) {
 function switchCamera(empId) {
     socket.emit('admin:switch-camera', { employeeId: empId });
   }
+
+  function toggleMic(empId) {
+  var vid = document.getElementById('vid-'+empId);
+  if (!vid) return;
+  var mbtn = document.getElementById('mbtn-'+empId);
+  if (vid.muted) {
+    vid.muted = false;
+    mbtn.textContent = '🔇 Mute Audio';
+    mbtn.style.background = 'rgba(0,229,255,0.08)';
+    mbtn.style.borderColor = 'rgba(0,229,255,0.2)';
+    mbtn.style.color = 'var(--accent)';
+  } else {
+    vid.muted = true;
+    mbtn.textContent = '🔊 Unmute Audio';
+    mbtn.style.background = 'rgba(255,107,107,0.1)';
+    mbtn.style.borderColor = 'rgba(255,107,107,0.3)';
+    mbtn.style.color = 'var(--red)';
+  }
+}
 
 function updateStats() {
   var keys   = Object.keys(employees);
