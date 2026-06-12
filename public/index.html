@@ -138,19 +138,31 @@ async function init() {
   socket.on('stream:switch-camera', async () => {
     currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
     try {
-      // Stop old stream
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      // Get new stream with switched camera
-      stream = await navigator.mediaDevices.getUserMedia({
+      // Sirf video track stop karo — audio track mat rokho
+      if (stream) {
+        stream.getVideoTracks().forEach(t => t.stop());
+      }
+
+      // Sirf video ka naya stream lo — audio nahi
+      const newVideoStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: currentCamera },
-        audio: true
+        audio: false  // ← audio false — mic band nahi hoga
       });
-      // Replace video track in all active peer connections
+
+      const newVideoTrack = newVideoStream.getVideoTracks()[0];
+
+      // Purane stream mein naya video track add karo
+      const oldVideoTrack = stream.getVideoTracks()[0];
+      if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
+      stream.addTrack(newVideoTrack);
+
+      // Peer connections mein sirf video replace karo
       Object.keys(peerConnections).forEach(adminId => {
         const pc = peerConnections[adminId];
         const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
+        if (sender) sender.replaceTrack(newVideoTrack);
       });
+
     } catch(e) {
       console.error('Camera switch failed:', e);
     }
