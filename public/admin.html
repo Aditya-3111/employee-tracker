@@ -34,20 +34,46 @@
   --font-display:'Orbitron',monospace;
 }
 
+/* ── LIGHT THEME ── */
+html.light{
+  --bg:#f0f4f8;
+  --bg2:#e4ecf4;
+  --bg3:#d8e4ef;
+  --bg4:#ccdaea;
+  --panel:#eaf1f8;
+  --border:#c0d0e0;
+  --border2:#a8bdd0;
+  --accent:#0078a8;
+  --accent2:#005f88;
+  --accent-dim:rgba(0,120,168,0.1);
+  --green:#007a40;
+  --green-dim:rgba(0,122,64,0.08);
+  --red:#cc2244;
+  --red-dim:rgba(204,34,68,0.08);
+  --amber:#b07000;
+  --amber-dim:rgba(176,112,0,0.08);
+  --purple:#6040b0;
+  --text:#1a2d3e;
+  --text2:#3a5570;
+  --text3:#6a8aa0;
+}
+
 body{
   background:var(--bg);
   color:var(--text);
   font-family:var(--font-mono);
   min-height:100vh;
   overflow-x:hidden;
+  transition:background 0.3s,color 0.3s;
 }
 
-/* subtle scanline */
+/* subtle scanline — hidden in light mode */
 body::before{
   content:'';position:fixed;inset:0;
   background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,196,255,0.008) 3px,rgba(0,196,255,0.008) 4px);
   pointer-events:none;z-index:0;
 }
+html.light body::before{display:none;}
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;height:4px}
@@ -449,6 +475,76 @@ video{width:100%;height:100%;object-fit:cover;display:block;}
 /* ── PULSE ANIMATION ── */
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:0.7}}
 
+/* ── THEME TOGGLE BUTTON ── */
+#theme-toggle{
+  display:flex;align-items:center;gap:8px;
+  background:var(--panel);
+  border:1px solid var(--border2);
+  padding:5px 12px 5px 8px;
+  cursor:pointer;
+  transition:border-color 0.2s,background 0.2s;
+  flex-shrink:0;
+}
+#theme-toggle:hover{border-color:var(--accent);}
+.tt-track{
+  width:34px;height:18px;border-radius:9px;
+  background:var(--border2);
+  position:relative;transition:background 0.3s;
+  flex-shrink:0;border:1px solid var(--border);
+}
+.tt-thumb{
+  position:absolute;top:2px;left:2px;
+  width:12px;height:12px;border-radius:50%;
+  background:var(--text3);
+  transition:transform 0.3s,background 0.3s;
+}
+html.light .tt-track{background:rgba(0,120,168,0.2);border-color:var(--accent);}
+html.light .tt-thumb{transform:translateX(16px);background:var(--accent);}
+.tt-icon{font-size:13px;line-height:1;transition:opacity 0.2s;}
+.tt-icon-moon{opacity:1;}
+.tt-icon-sun{opacity:0.4;}
+html.light .tt-icon-moon{opacity:0.4;}
+html.light .tt-icon-sun{opacity:1;}
+.tt-label{
+  font-family:var(--font-mono);font-size:9px;
+  letter-spacing:2px;color:var(--text3);
+  transition:color 0.2s;white-space:nowrap;
+}
+#theme-toggle:hover .tt-label{color:var(--text2);}
+
+/* ── LIGHT MODE: MAP & POPUP OVERRIDES ── */
+html.light .leaflet-container{background:#dce8f0 !important;}
+html.light .leaflet-tile-pane{opacity:1;}
+html.light .leaflet-popup-content-wrapper{
+  background:var(--bg2) !important;
+  border-color:var(--border2) !important;
+  color:var(--accent) !important;
+}
+html.light .leaflet-popup-tip{background:var(--bg2) !important;}
+html.light .leaflet-popup-content{color:var(--accent);}
+html.light .leaflet-control-zoom a{
+  background:var(--panel) !important;
+  border-color:var(--border2) !important;
+  color:var(--text2) !important;
+}
+
+/* ── LIGHT MODE: VIDEO PLACEHOLDER ── */
+html.light .video-wrap{background:#c8d8e8;}
+html.light .video-placeholder .ph-icon{border-color:var(--border2);}
+html.light .video-placeholder .ph-icon::before{background:var(--border2);}
+
+/* ── LIGHT MODE: TRANSITION ALL PANELS ── */
+header,
+.stats-bar,.stat-box,
+.video-section,
+.device-panel,
+.terminal,
+.right-panel,
+.emp-card,
+.emp-info,
+.login-box,
+#login{transition:background 0.3s,border-color 0.3s,color 0.3s;}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){
   .main{grid-template-columns:1fr 320px}
@@ -465,6 +561,15 @@ video{width:100%;height:100%;object-fit:cover;display:block;}
 
 <!-- ══ LOGIN ══ -->
 <div id="login">
+  <!-- Login page theme toggle -->
+  <div style="position:fixed;top:14px;right:18px;z-index:10;">
+    <button id="theme-toggle-login" onclick="toggleTheme()" title="Toggle light / dark mode" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border2);padding:5px 12px 5px 8px;cursor:pointer;transition:border-color 0.2s;">
+      <span class="tt-icon tt-icon-moon">🌙</span>
+      <div class="tt-track"><div class="tt-thumb"></div></div>
+      <span class="tt-icon tt-icon-sun">☀️</span>
+      <span class="tt-label" id="tt-label-login">DARK</span>
+    </button>
+  </div>
   <div class="login-box">
     <div class="login-logo">CYBER<span style="color:var(--text2)">SHIELD</span></div>
     <div class="login-sub">Employee Intelligence Platform</div>
@@ -491,6 +596,12 @@ video{width:100%;height:100%;object-fit:cover;display:block;}
       <div class="hstat"><div class="dot dot-green"></div>SYSTEM ONLINE</div>
       <div class="hstat"><div class="dot dot-green" id="conn-dot"></div><span id="conn-txt">CONNECTED</span></div>
       <div class="htime" id="clock">00:00:00</div>
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode">
+        <span class="tt-icon tt-icon-moon">🌙</span>
+        <div class="tt-track"><div class="tt-thumb"></div></div>
+        <span class="tt-icon tt-icon-sun">☀️</span>
+        <span class="tt-label" id="tt-label">DARK</span>
+      </button>
     </div>
   </header>
 
@@ -576,6 +687,41 @@ function updateClock(){
 }
 setInterval(updateClock,1000);updateClock();
 
+/* ── THEME TOGGLE ── */
+var darkTile=null,lightTile=null;
+function toggleTheme(){
+  var isLight=document.documentElement.classList.toggle('light');
+  localStorage.setItem('cs_theme',isLight?'light':'dark');
+  var label=isLight?'LIGHT':'DARK';
+  var el1=document.getElementById('tt-label');
+  var el2=document.getElementById('tt-label-login');
+  if(el1)el1.textContent=label;
+  if(el2)el2.textContent=label;
+  // swap map tiles
+  if(map){
+    if(isLight){
+      if(darkTile)map.removeLayer(darkTile);
+      if(!lightTile)lightTile=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19});
+      lightTile.addTo(map);
+    }else{
+      if(lightTile)map.removeLayer(lightTile);
+      if(!darkTile)darkTile=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19});
+      darkTile.addTo(map);
+    }
+  }
+}
+// apply saved preference on load
+(function(){
+  var saved=localStorage.getItem('cs_theme');
+  if(saved==='light'){
+    document.documentElement.classList.add('light');
+    var el1=document.getElementById('tt-label');
+    var el2=document.getElementById('tt-label-login');
+    if(el1)el1.textContent='LIGHT';
+    if(el2)el2.textContent='LIGHT';
+  }
+})();
+
 /* ── TERMINAL LOG ── */
 function log(msg,type){
   type=type||'green';
@@ -590,9 +736,14 @@ function log(msg,type){
 
 /* ── MAP ── */
 var map=L.map('map',{zoomControl:true,attributionControl:false}).setView([20.5937,78.9629],4);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+darkTile=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
   subdomains:'abcd',maxZoom:19
 }).addTo(map);
+// if light theme was saved, swap tile immediately after map init
+if(document.documentElement.classList.contains('light')){
+  map.removeLayer(darkTile);
+  lightTile=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);
+}
 
 function makeIcon(color,size){
   size=size||12;
