@@ -499,9 +499,9 @@ var mapTileDark  = null;
 var mapTileLight = null;
 var mapIsLight   = false;   // independent map-theme state
 
-var TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_matter_all/{z}/{x}/{y}{r}.png';
-var TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-var TILE_OPTS  = {subdomains:'abcd',maxZoom:19,attribution:''};
+var TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}.png';
+var TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+var TILE_OPTS  = {subdomains:'abcd',maxZoom:19,attribution:'',crossOrigin:true};
 
 function initMap(){
   if(map)return;
@@ -518,12 +518,17 @@ function initMap(){
     preferCanvas:true
   }).setView([20.5937,78.9629],4);
 
-  mapTileDark=L.tileLayer(TILE_DARK,TILE_OPTS);
-  mapTileLight=L.tileLayer(TILE_LIGHT,TILE_OPTS);
+  /* Always create fresh tile layers — never reuse stale references */
+  function applyMapTile(isLight){
+    /* Remove every existing tile layer */
+    map.eachLayer(function(layer){
+      if(layer instanceof L.TileLayer)map.removeLayer(layer);
+    });
+    var url=isLight?TILE_LIGHT:TILE_DARK;
+    L.tileLayer(url,TILE_OPTS).addTo(map);
+  }
 
-  /* Apply initial tile based on mapIsLight */
-  if(mapIsLight){mapTileLight.addTo(map);}
-  else{mapTileDark.addTo(map);}
+  applyMapTile(mapIsLight);
 
   /* Force a size recalculation after a tick */
   setTimeout(function(){map.invalidateSize();},100);
@@ -536,14 +541,16 @@ function toggleMapTheme(){
   mapIsLight=!mapIsLight;
   localStorage.setItem('cs_map_theme',mapIsLight?'light':'dark');
 
+  /* Remove ALL tile layers, add the correct one fresh */
+  map.eachLayer(function(layer){
+    if(layer instanceof L.TileLayer)map.removeLayer(layer);
+  });
+  L.tileLayer(mapIsLight?TILE_LIGHT:TILE_DARK,TILE_OPTS).addTo(map);
+
   if(mapIsLight){
-    if(map.hasLayer(mapTileDark))map.removeLayer(mapTileDark);
-    if(!map.hasLayer(mapTileLight))mapTileLight.addTo(map);
     document.getElementById('map-theme-label').textContent='DARK MAP';
     document.getElementById('map-theme-icon').textContent='🌙';
   }else{
-    if(map.hasLayer(mapTileLight))map.removeLayer(mapTileLight);
-    if(!map.hasLayer(mapTileDark))mapTileDark.addTo(map);
     document.getElementById('map-theme-label').textContent='LIGHT MAP';
     document.getElementById('map-theme-icon').textContent='🗺️';
   }
